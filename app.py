@@ -30,7 +30,15 @@ st.set_page_config(
     layout="centered"
 )
 
-tab1, tab2, tab3 = st.tabs(["Knowledge Base", "Add Knowledge", "Chat Room"])
+home_tab, tab1, tab2, tab3 = st.tabs(["Welcome", "Knowledge Base", "Add Knowledge", "Chat Room"])
+with home_tab:
+    st.header("Hello there!")
+    st.markdown("""
+        <p>Welcome! We're excited to have you here exploring our LLM app.</p>
+        <p>Think of this space as your go-to companion for finding the information you need, pulling together knowledge from different corners to give you clear, meaningful answers. </p>
+        <p>Whether you’re here to dig deep into a topic, automate some of your workflows, or simply see what our AI can uncover for you, we hope you find the experience both intuitive and enlightening.</p>
+        <p>If there's anything you'd like to know or explore, don't hesitate to dive in—this space is built for curiosity and discovery, and we’re here to make that journey as seamless and insightful as possible for you!</p>
+    """, unsafe_allow_html=True)
 
 
 def get_pdf_text(pdf_docs) -> Tuple[str, Document]:
@@ -119,7 +127,7 @@ def get_retriever(docs, update_docs=True):
     return retriever
 
 def get_conversation_chain(retriever):
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=os.getenv("OPENAI_API_KEY"))
+    llm = ChatOpenAI(model=st.session_state.llm_model, temperature=0.7, api_key=os.getenv("OPENAI_API_KEY"))
     memory = ConversationBufferMemory(
         memory_key="chat_history", 
         input_key="question",
@@ -214,6 +222,8 @@ def main():
         st.session_state.pdf_contents = {}
     if "num_rag_contexts" not in st.session_state:
         st.session_state.num_rag_contexts = 10
+    if "llm_model" not in st.session_state:
+        st.session_state.llm_model = "gpt-4o-mini"
         
     with tab3:
         st.title("Document Chatbot Assistant")
@@ -249,9 +259,10 @@ def main():
                         st.markdown(message.content)
                     
     with tab2:
-        st.subheader("RAG Contexts", divider = True)
-        form_rag_contexts  = st.form(key="form_rag_contexts")
-        k_docs_for_rag = form_rag_contexts.number_input(
+        st.subheader("Global State", divider = True)
+        form_global_state  = st.form(key="form_global_state")
+        llm_model = form_global_state.selectbox("Choose your model", options=["gpt-4o-mini"])
+        k_docs_for_rag = form_global_state.number_input(
             "Number of documents for RAG contexts", 
             min_value = 1,
             max_value = 50,
@@ -259,22 +270,22 @@ def main():
             step = 1,
             key = "k_docs_for_rag"
         )
-        if form_rag_contexts.form_submit_button("Update Context Number"):
+        if form_global_state.form_submit_button("Update Global State"):
             st.session_state.num_rag_contexts = k_docs_for_rag
+            st.session_state.llm_model = llm_model
         
         st.subheader("Upload PDF Files", divider = True)
-        pdf_docs = st.file_uploader("**Upload your PDFs here and click on Process**", accept_multiple_files=True)
+        form_pdf_uploads = st.form(key="form_pdf_uploads")
+        pdf_docs = form_pdf_uploads.file_uploader("**Upload your PDFs here and click on Process**", accept_multiple_files=True)
         st.write("**WARNING**: The citation prompt is still bad")
-        if pdf_docs:
-            if st.button("Process"):
-                with st.spinner("Processing"):
-                    raw_text, docs = get_pdf_text(pdf_docs)
-                    text_chunks = get_text_chunks(raw_text)
-                    retriever = get_retriever(text_chunks)
-                    if st.session_state.conversation is None:
-                        st.session_state.conversation = get_conversation_chain(retriever)
-                    else:
-                        st.session_state.conversation.retriever = retriever
+        if form_pdf_uploads.form_submit_button("Process"):
+            raw_text, docs = get_pdf_text(pdf_docs)
+            text_chunks = get_text_chunks(raw_text)
+            retriever = get_retriever(text_chunks)
+            if st.session_state.conversation is None:
+                st.session_state.conversation = get_conversation_chain(retriever)
+            else:
+                st.session_state.conversation.retriever = retriever
         st.markdown("---")
         
         # PubMed Section
