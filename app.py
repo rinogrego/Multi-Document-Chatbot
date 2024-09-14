@@ -17,6 +17,7 @@ from langchain.retrievers import EnsembleRetriever
 
 from dotenv import load_dotenv
 from utils.scrap_pubmed_abstracts import scrap_pubmed
+from utils.scrap_pubmed_article import scrap_article_bs4
 import pandas as pd
 
 import os
@@ -224,6 +225,9 @@ def main():
         st.session_state.num_rag_contexts = 10
     if "llm_model" not in st.session_state:
         st.session_state.llm_model = "gpt-4o-mini"
+    if "pmcids" not in st.session_state:
+        st.session_state.pmcids = []
+        st.session_state.pmcid_articles = {}
         
     with tab3:
         st.title("Document Chatbot Assistant")
@@ -273,6 +277,7 @@ def main():
         if form_global_state.form_submit_button("Update Global State"):
             st.session_state.num_rag_contexts = k_docs_for_rag
             st.session_state.llm_model = llm_model
+        st.markdown("---")
         
         st.subheader("Upload PDF Files", divider = True)
         form_pdf_uploads = st.form(key="form_pdf_uploads")
@@ -345,6 +350,47 @@ def main():
                     # update retriever to accomodate new documents
                     st.session_state.conversation.retriever = retriever
 
+        # PubMed Full Articles
+        st.subheader("Crawl PubMed Article", divider=True)
+        form_pubmed_article = st.form(key="form_pubmed_full_papers_search")
+        pmcid = form_pubmed_article.text_input("**Enter PMCID:**", placeholder="e.g.: PMC8822225")
+        if form_pubmed_article.form_submit_button("Get Article"): 
+            if pmcid not in st.session_state.pmcids:
+                raw_text = scrap_article_bs4(pmcid=pmcid)
+                st.session_state.pmcids.append(pmcid)
+                st.session_state.pmcid_articles[pmcid] = {
+                    "raw_text": raw_text
+                }
+            else:
+                raw_text = st.session_state.pmcid_articles[pmcid]["raw_text"]
+            # raw_text, docs = get_pdf_text(pdf_docs)
+            print("MASUK")
+            text_chunks = get_text_chunks(raw_text)
+            retriever = get_retriever(text_chunks)
+            if st.session_state.conversation is None:
+                st.session_state.conversation = get_conversation_chain(retriever)
+            else:
+                st.session_state.conversation.retriever = retriever
+        st.markdown("---")
+        
+        # arXiv Abstracts
+        st.subheader("Scrap arXiv Abstracts", divider=True)
+        
+        st.markdown("---")
+        
+        # arXiv paper
+        st.subheader("Scrap arXiv Articles", divider=True)
+        
+        st.markdown("---")
+        
+        # Wikipedia Article
+        st.subheader("Scrap Wikipedia Articles", divider=True)
+        
+        st.markdown("---")
+        
+        # Duckduckgo search
+        st.subheader("Duck Duck Go Search", divider=True)
+        
     with tab1:
         st.subheader("PDFs Uploaded", divider = True)
         # display_pdfs_uploaded
@@ -369,7 +415,6 @@ def main():
             """
             st.write(no_pdf_html, unsafe_allow_html=True)
         else:
-            
             for title in st.session_state.pdf_titles:
                 pdf_html = f"""
                 <h5>{title}</h5>
@@ -387,10 +432,10 @@ def main():
             # pdf_viewer(pdf.getvalue())
             # # pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="500" height="500" type="application/pdf"></iframe>'
             # # st.markdown(pdf_display, unsafe_allow_html=True)
-            
+     
         st.markdown("---")
         
-        st.subheader("PubMed Abstracts Scrapped", divider = True)
+        st.subheader("PubMed Abstracts", divider = True)
         if len(st.session_state.pubmed_papers_keywords) == 0:
             no_pubmed_html = """
             <div style="display: flex; justify-content: center; align-items: center; color: #ff4b4b; margin-top: 5px;">
@@ -430,5 +475,26 @@ def main():
                     idx += 1
         
         st.markdown("---")
+        st.subheader("PubMed Articles", divider = True)
+        if len(st.session_state.pmcids) == 0:
+            no_pubmed_html = """
+            <div style="display: flex; justify-content: center; align-items: center; color: #ff4b4b; margin-top: 5px;">
+                <div style="padding: 5px">
+                    <p style="font-size: 20px; text-align: center;">No PubMed articles crawled yet.</p>
+                    <p style="font-size: 16px; text-align: center;">You can crawl a PubMed article in Add Knowledge tab</p>
+                </div>
+            </div>
+            """
+            st.write(no_pubmed_html, unsafe_allow_html=True)
+        else:
+            expander = st.expander(f"**PMCID: {pmcid}**")
+            for pmcid in st.session_state.pmcids:
+                pmcid_html = f"""
+                <h5>{pmcid}</h5>
+                <p>{st.session_state.pmcid_articles[pmcid]["raw_text"]}</p>
+                <hr>
+                """
+                expander.write(pmcid_html, unsafe_allow_html=True)
+        
 if __name__ == "__main__":
     main()

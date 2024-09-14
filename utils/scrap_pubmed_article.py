@@ -76,37 +76,12 @@ def scrap_article_bs4(pmcid="PMC8822225"):
     # Parse the HTML content
     soup = BeautifulSoup(response.content, "html.parser")
 
-    # Extract and display the HTML string nicely
-    html_string = soup.prettify()
-
+    # # Extract and display the HTML string nicely
+    # html_string = soup.prettify()
     # # Print the HTML content
     # pprint.pprint(html_string)
     
-    raw_text = ""
-    # # Print the extracted content
-    # for num in range(1, 20): # 20 just random number. lets just assume the pubmed full article sections don't reach or surpass that
-    #     # Extract the div with id="sec1"
-    #     sec_div = soup.find("div", id=f"sec{num}")
-    #     if sec_div:
-    #         # decompose table and img
-    #         for table in sec_div.find_all("table"):
-    #             table.decompose()
-    #         # Find and remove all tags with class name "table-wrap"
-    #         for tag in sec_div.find_all(class_="table-wrap"):
-    #             tag.decompose()
-    #         for img in sec_div.find_all("img"):
-    #             img.decompose()
-    #         for tag in sec_div.find_all(class_="fig"):
-    #             tag.decompose()
-            
-    #         title = sec_div.find(id=f"sec{num}title").get_text()
-    #         raw_text += title + "\n"
-    #         raw_text += sec_div.get_text().replace(title, "") + "\n\n"
-    #         print()
-    #         print()
-    #     else:
-    #         break
-    
+    raw_text = f"[PMCID] {pmcid}\n\n"
     sections = soup.find_all(class_="tsec sec")
     for sec_div in sections:
         # decompose table and img
@@ -120,10 +95,10 @@ def scrap_article_bs4(pmcid="PMC8822225"):
         for tag in sec_div.find_all(class_="fig"):
             tag.decompose()
         
-        title = sec_div.find(class_="head").get_text()
-        raw_text += title + "\n"
-        if title.lower() != "references":
-            raw_text += sec_div.get_text().replace(title, "") + "\n\n"
+        sec_title = sec_div.find(class_="head").get_text()
+        raw_text += f"[Title] {sec_title}" + "\n"
+        if sec_title.lower() != "references":
+            raw_text += sec_div.get_text().replace(sec_title, "") + "\n\n"
         else:
             ref_sec = sec_div.find_all(class_="ref-cit-blk")
             for ref in ref_sec:
