@@ -81,8 +81,11 @@ def scrap_article_bs4(pmcid="PMC8822225"):
     # # Print the HTML content
     # pprint.pprint(html_string)
     
-    raw_text = f"[PMCID] {pmcid}\n\n"
     sections = soup.find_all(class_="tsec sec")
+    title = soup.find("h1").get_text()
+    metadata = {}
+    metadata["title"] = title
+    raw_text = f"[TITLE] {title}\n[PMCID] {pmcid}\n\n"
     for sec_div in sections:
         # decompose table and img
         for table in sec_div.find_all("table"):
@@ -104,7 +107,7 @@ def scrap_article_bs4(pmcid="PMC8822225"):
             for ref in ref_sec:
                 raw_text += ref.get_text() + "\n"
     
-    return raw_text
+    return raw_text, metadata
 
 def scrap_article_pdf_original_publisher(pmcid="PMC8822225"):
     # convert pmcid to pmid

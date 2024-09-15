@@ -104,12 +104,12 @@ def get_retriever(docs, update_docs=True):
         # Print all data
         docs = []
         for doc_id, doc in all_data.items():
-            print(f"Document ID : {doc_id}")
-            print(f"Doc         : {doc}")
+            # print(f"Document ID : {doc_id}")
+            # print(f"Doc         : {doc}")
             # print(f"Content: {doc['page_content']}")
             # print(f"Metadata: {doc['metadata']}")
-            print(type(doc))
-            print("\n" + "-"*50 + "\n")
+            # print(type(doc))
+            # print("\n" + "-"*50 + "\n")
             docs.append(doc)
     
     # from: https://medium.com/@nadikapoudel16/advanced-rag-implementation-using-hybrid-search-reranking-with-zephyr-alpha-llm-4340b55fef22
@@ -227,6 +227,7 @@ def main():
         st.session_state.llm_model = "gpt-4o-mini"
     if "pmcids" not in st.session_state:
         st.session_state.pmcids = []
+        st.session_state.pmcids_metadata = {}
         st.session_state.pmcid_articles = {}
         
     with tab3:
@@ -356,15 +357,15 @@ def main():
         pmcid = form_pubmed_article.text_input("**Enter PMCID:**", placeholder="e.g.: PMC8822225")
         if form_pubmed_article.form_submit_button("Get Article"): 
             if pmcid not in st.session_state.pmcids:
-                raw_text = scrap_article_bs4(pmcid=pmcid)
+                raw_text, metadata = scrap_article_bs4(pmcid=pmcid)
                 st.session_state.pmcids.append(pmcid)
+                st.session_state.pmcids_metadata[pmcid] = metadata
                 st.session_state.pmcid_articles[pmcid] = {
                     "raw_text": raw_text
                 }
             else:
                 raw_text = st.session_state.pmcid_articles[pmcid]["raw_text"]
             # raw_text, docs = get_pdf_text(pdf_docs)
-            print("MASUK")
             text_chunks = get_text_chunks(raw_text)
             retriever = get_retriever(text_chunks)
             if st.session_state.conversation is None:
@@ -487,11 +488,16 @@ def main():
             """
             st.write(no_pubmed_html, unsafe_allow_html=True)
         else:
-            expander = st.expander(f"**PMCID: {pmcid}**")
+            expander = st.expander(f"**Total articles: {len(st.session_state.pmcids)}**")
             for pmcid in st.session_state.pmcids:
+                # pmcid_html = f"""
+                # <h5>{pmcid}</h5>
+                # <p>{st.session_state.pmcid_articles[pmcid]["raw_text"]}</p>
+                # <hr>
+                # """
                 pmcid_html = f"""
-                <h5>{pmcid}</h5>
-                <p>{st.session_state.pmcid_articles[pmcid]["raw_text"]}</p>
+                <h5>{st.session_state.pmcids_metadata[pmcid]["title"]}</h5>
+                <p>PMCID: {pmcid}</p>
                 <hr>
                 """
                 expander.write(pmcid_html, unsafe_allow_html=True)
