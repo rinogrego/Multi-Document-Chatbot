@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts.chat import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain_core.prompts.prompt import PromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.retrievers import BM25Retriever
+from langchain_community.retrievers import BM25Retriever, WikipediaRetriever
 from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains.conversational_retrieval.base import ConversationalRetrievalChain
@@ -31,7 +31,7 @@ st.set_page_config(
     layout="centered"
 )
 
-home_tab, tab1, tab2, tab3 = st.tabs(["Welcome", "Knowledge Base", "Add Knowledge", "Chat Room"])
+home_tab, tab1, tab2, tab3, tab4 = st.tabs(["Welcome", "Knowledge Base", "Add Knowledge", "Chat Room", "Chat History"])
 with home_tab:
     st.header("Hello there!")
     st.markdown("""
@@ -229,6 +229,8 @@ def main():
         st.session_state.pmcids = []
         st.session_state.pmcids_metadata = {}
         st.session_state.pmcid_articles = {}
+    if "wikipedia_searches" not in st.session_state:
+        st.session_state.wikipedia_searches = {}
         
     with tab3:
         st.title("Document Chatbot Assistant")
@@ -278,8 +280,9 @@ def main():
         if form_global_state.form_submit_button("Update Global State"):
             st.session_state.num_rag_contexts = k_docs_for_rag
             st.session_state.llm_model = llm_model
-        st.markdown("---")
         
+        # Custom PDF files
+        st.markdown("---")
         st.subheader("Upload PDF Files", divider = True)
         form_pdf_uploads = st.form(key="form_pdf_uploads")
         pdf_docs = form_pdf_uploads.file_uploader("**Upload your PDFs here and click on Process**", accept_multiple_files=True)
@@ -292,9 +295,9 @@ def main():
                 st.session_state.conversation = get_conversation_chain(retriever)
             else:
                 st.session_state.conversation.retriever = retriever
-        st.markdown("---")
         
         # PubMed Section
+        st.markdown("---")
         st.subheader("Scrap PubMed Abstracts", divider=True)
         form = st.form(key="form_pubmed_search")
         search_query = form.text_input("**Enter your keywords:**", placeholder="e.g.: diabetes machine learning")
@@ -352,6 +355,7 @@ def main():
                     st.session_state.conversation.retriever = retriever
 
         # PubMed Full Articles
+        st.markdown("---")
         st.subheader("Crawl PubMed Article", divider=True)
         form_pubmed_article = st.form(key="form_pubmed_full_papers_search")
         pmcid = form_pubmed_article.text_input("**Enter PMCID:**", placeholder="e.g.: PMC8822225")
@@ -372,25 +376,36 @@ def main():
                 st.session_state.conversation = get_conversation_chain(retriever)
             else:
                 st.session_state.conversation.retriever = retriever
-        st.markdown("---")
-        
-        # arXiv Abstracts
-        st.subheader("Scrap arXiv Abstracts", divider=True)
-        
-        st.markdown("---")
-        
-        # arXiv paper
-        st.subheader("Scrap arXiv Articles", divider=True)
-        
-        st.markdown("---")
         
         # Wikipedia Article
-        st.subheader("Scrap Wikipedia Articles", divider=True)
-        
         st.markdown("---")
+        st.subheader("Scrap Wikipedia Articles", divider=True)
+        wiki_article = st.form(key="wikipedia_articles_search")
+        wiki_keywords = wiki_article.text_input("**Enter Wikipedia Keywords:**", placeholder="e.g.: Bioinformatics")
+        if wiki_article.form_submit_button("Get Wikipedia Article"): 
+            if wiki_keywords.lower() not in st.session_state.wikipedia_searches:
+                wiki_retriever = WikipediaRetriever()
+                docs = wiki_retriever.invoke(wiki_keywords)
+                st.session_state.wikipedia_searches[wiki_keywords.lower()] = docs
+            else:
+                docs = st.session_state.wikipedia_searches[wiki_keywords.lower()]
+            retriever = get_retriever(docs)
+            if st.session_state.conversation is None:
+                st.session_state.conversation = get_conversation_chain(retriever)
+            else:
+                st.session_state.conversation.retriever = retriever
         
-        # Duckduckgo search
-        st.subheader("Duck Duck Go Search", divider=True)
+        # # arXiv paper
+        # st.markdown("---")        
+        # st.subheader("Scrap arXiv Articles", divider=True)
+        
+        # # arXiv Abstracts
+        # st.markdown("---")
+        # st.subheader("Scrap arXiv Abstracts", divider=True)
+        
+        # # Duckduckgo search
+        # st.markdown("---")
+        # st.subheader("Duck Duck Go Search", divider=True)
         
     with tab1:
         st.subheader("PDFs Uploaded", divider = True)
@@ -501,6 +516,34 @@ def main():
                 <hr>
                 """
                 expander.write(pmcid_html, unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.subheader("Wikipedia Articles", divider = True)
+        if len(st.session_state.wikipedia_searches) == 0:
+            no_wiki_html = """
+            <div style="display: flex; justify-content: center; align-items: center; color: #ff4b4b; margin-top: 5px;">
+                <div style="padding: 5px">
+                    <p style="font-size: 20px; text-align: center;">No Wikipedia articles crawled yet.</p>
+                    <p style="font-size: 16px; text-align: center;">You can crawl a Wikipedia article in Add Knowledge tab</p>
+                </div>
+            </div>
+            """
+            st.write(no_wiki_html, unsafe_allow_html=True)
+        else:
+            expander = st.expander(f"**Total Keywords: {len(st.session_state.wikipedia_searches)}**")
+            for keyword, docs in st.session_state.wikipedia_searches.items():
+                wiki_html = f"""<h5>Keywords: {keyword}</h5>"""
+                for wiki_document in st.session_state.wikipedia_searches[keyword]:
+                    title = wiki_document.metadata["title"]
+                    summary = wiki_document.metadata["summary"]
+                    source = wiki_document.metadata["source"]
+                    wiki_document_html = f"""<div><h5>{title}</h5><a href="{source}">Check Source</a></div><br>
+                    """
+                    wiki_html += wiki_document_html
+                expander.write(wiki_html, unsafe_allow_html=True)
         
+    with tab4:
+        st.write(st.session_state.chat_history)
+
 if __name__ == "__main__":
     main()
